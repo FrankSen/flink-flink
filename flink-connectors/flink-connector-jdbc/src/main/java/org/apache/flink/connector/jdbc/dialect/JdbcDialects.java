@@ -22,11 +22,17 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 
-/** Default JDBC dialects. */
+/**
+ * Default JDBC dialects.
+ */
 public final class JdbcDialects {
 
-    private static final List<JdbcDialect> DIALECTS =
-            Arrays.asList(new DerbyDialect(), new MySQLDialect(), new PostgresDialect());
+	private static final List<JdbcDialect> DIALECTS = Arrays.asList(
+		new DerbyDialect(),
+		new MySQLDialect(),
+		new PostgresDialect(),
+		new ClickHouseDialect()
+	);
 
     /** Fetch the JdbcDialect class corresponding to a given database url. */
     public static Optional<JdbcDialect> get(String url) {
