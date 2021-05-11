@@ -19,6 +19,7 @@
 package org.apache.flink.formats.json;
 
 import org.apache.flink.api.common.typeinfo.TypeInformation;
+import org.apache.flink.formats.common.TimestampFormat;
 import org.apache.flink.table.data.GenericMapData;
 import org.apache.flink.table.data.GenericRowData;
 import org.apache.flink.table.data.RowData;
@@ -195,7 +196,8 @@ public class JsonRowDataSerDeSchemaTest {
                         schema,
                         TimestampFormat.ISO_8601,
                         JsonOptions.MapNullKeyMode.LITERAL,
-                        "null");
+                        "null",
+                        true);
 
         byte[] actualBytes = serializationSchema.serialize(rowData);
         assertEquals(new String(serializedJson), new String(actualBytes));
@@ -284,7 +286,8 @@ public class JsonRowDataSerDeSchemaTest {
                         rowType,
                         TimestampFormat.ISO_8601,
                         JsonOptions.MapNullKeyMode.LITERAL,
-                        "null");
+                        "null",
+                        true);
 
         ObjectMapper objectMapper = new ObjectMapper();
 
@@ -368,7 +371,8 @@ public class JsonRowDataSerDeSchemaTest {
                         rowType,
                         TimestampFormat.ISO_8601,
                         JsonOptions.MapNullKeyMode.LITERAL,
-                        "null");
+                        "null",
+                        true);
 
         for (int i = 0; i < jsons.length; i++) {
             String json = jsons[i];
@@ -429,13 +433,8 @@ public class JsonRowDataSerDeSchemaTest {
 
         // fail on missing field
         deserializationSchema =
-                deserializationSchema =
-                        new JsonRowDataDeserializationSchema(
-                                schema,
-                                InternalTypeInfo.of(schema),
-                                true,
-                                false,
-                                TimestampFormat.ISO_8601);
+                new JsonRowDataDeserializationSchema(
+                        schema, InternalTypeInfo.of(schema), true, false, TimestampFormat.ISO_8601);
 
         String errorMessage = "Failed to deserialize JSON '{\"id\":123123123}'.";
         try {
@@ -484,7 +483,11 @@ public class JsonRowDataSerDeSchemaTest {
                         rowType, InternalTypeInfo.of(rowType), false, false, TimestampFormat.SQL);
         JsonRowDataSerializationSchema serializationSchema =
                 new JsonRowDataSerializationSchema(
-                        rowType, TimestampFormat.SQL, JsonOptions.MapNullKeyMode.LITERAL, "null");
+                        rowType,
+                        TimestampFormat.SQL,
+                        JsonOptions.MapNullKeyMode.LITERAL,
+                        "null",
+                        true);
 
         ObjectMapper objectMapper = new ObjectMapper();
 
@@ -523,7 +526,11 @@ public class JsonRowDataSerDeSchemaTest {
 
         JsonRowDataSerializationSchema serializationSchema1 =
                 new JsonRowDataSerializationSchema(
-                        rowType, TimestampFormat.SQL, JsonOptions.MapNullKeyMode.FAIL, "null");
+                        rowType,
+                        TimestampFormat.SQL,
+                        JsonOptions.MapNullKeyMode.FAIL,
+                        "null",
+                        true);
         // expect message for serializationSchema1
         String errorMessage1 =
                 "JSON format doesn't support to serialize map data with null keys."
@@ -531,7 +538,11 @@ public class JsonRowDataSerDeSchemaTest {
 
         JsonRowDataSerializationSchema serializationSchema2 =
                 new JsonRowDataSerializationSchema(
-                        rowType, TimestampFormat.SQL, JsonOptions.MapNullKeyMode.DROP, "null");
+                        rowType,
+                        TimestampFormat.SQL,
+                        JsonOptions.MapNullKeyMode.DROP,
+                        "null",
+                        true);
         // expect result for serializationSchema2
         String expectResult2 = "{\"nestedMap\":{\"no-null key\":{\"no-null key\":1}}}";
 
@@ -540,7 +551,8 @@ public class JsonRowDataSerDeSchemaTest {
                         rowType,
                         TimestampFormat.SQL,
                         JsonOptions.MapNullKeyMode.LITERAL,
-                        "nullKey");
+                        "nullKey",
+                        true);
         // expect result for serializationSchema3
         String expectResult3 =
                 "{\"nestedMap\":{\"no-null key\":{\"no-null key\":1,\"nullKey\":2},\"nullKey\":{\"no-null key\":1,\"nullKey\":2}}}";
@@ -560,6 +572,51 @@ public class JsonRowDataSerDeSchemaTest {
         // mapNullKey Mode is literal
         byte[] actual3 = serializationSchema3.serialize(rowData);
         assertEquals(expectResult3, new String(actual3));
+    }
+
+    @Test
+    public void testSerializationDecimalEncode() throws Exception {
+        RowType schema =
+                (RowType)
+                        ROW(
+                                        FIELD("decimal1", DECIMAL(9, 6)),
+                                        FIELD("decimal2", DECIMAL(20, 0)),
+                                        FIELD("decimal3", DECIMAL(11, 9)))
+                                .getLogicalType();
+
+        TypeInformation<RowData> resultTypeInfo = InternalTypeInfo.of(schema);
+
+        JsonRowDataDeserializationSchema deserializer =
+                new JsonRowDataDeserializationSchema(
+                        schema, resultTypeInfo, false, false, TimestampFormat.ISO_8601);
+
+        JsonRowDataSerializationSchema plainDecimalSerializer =
+                new JsonRowDataSerializationSchema(
+                        schema,
+                        TimestampFormat.ISO_8601,
+                        JsonOptions.MapNullKeyMode.LITERAL,
+                        "null",
+                        true);
+        JsonRowDataSerializationSchema scientificDecimalSerializer =
+                new JsonRowDataSerializationSchema(
+                        schema,
+                        TimestampFormat.ISO_8601,
+                        JsonOptions.MapNullKeyMode.LITERAL,
+                        "null",
+                        false);
+
+        String plainDecimalJson =
+                "{\"decimal1\":123.456789,\"decimal2\":454621864049246170,\"decimal3\":0.000000027}";
+        RowData rowData = deserializer.deserialize(plainDecimalJson.getBytes());
+
+        String plainDecimalResult = new String(plainDecimalSerializer.serialize(rowData));
+        assertEquals(plainDecimalJson, plainDecimalResult);
+
+        String scientificDecimalJson =
+                "{\"decimal1\":123.456789,\"decimal2\":4.5462186404924617E+17,\"decimal3\":2.7E-8}";
+
+        String scientificDecimalResult = new String(scientificDecimalSerializer.serialize(rowData));
+        assertEquals(scientificDecimalJson, scientificDecimalResult);
     }
 
     @Test

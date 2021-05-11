@@ -26,8 +26,8 @@ import org.apache.flink.runtime.executiongraph.failover.flip1.FixedDelayRestartB
 import org.apache.flink.runtime.io.network.partition.ResultPartitionType;
 import org.apache.flink.runtime.jobgraph.DistributionPattern;
 import org.apache.flink.runtime.jobgraph.JobGraph;
+import org.apache.flink.runtime.jobgraph.JobGraphTestUtils;
 import org.apache.flink.runtime.jobgraph.JobVertex;
-import org.apache.flink.runtime.jobgraph.ScheduleMode;
 import org.apache.flink.runtime.jobmanager.scheduler.SlotSharingGroup;
 import org.apache.flink.runtime.scheduler.SchedulerBase;
 import org.apache.flink.runtime.scheduler.SchedulerTestingUtils;
@@ -67,13 +67,13 @@ public class ExecutionGraphCoLocationRestartTest {
         groupVertex.setStrictlyCoLocatedWith(groupVertex2);
 
         // initiate and schedule job
-        final JobGraph jobGraph = new JobGraph(groupVertex, groupVertex2);
-        jobGraph.setScheduleMode(ScheduleMode.EAGER);
+        final JobGraph jobGraph = JobGraphTestUtils.streamingJobGraph(groupVertex, groupVertex2);
 
         final ManuallyTriggeredScheduledExecutorService delayExecutor =
                 new ManuallyTriggeredScheduledExecutorService();
         final SchedulerBase scheduler =
-                SchedulerTestingUtils.newSchedulerBuilder(jobGraph)
+                SchedulerTestingUtils.newSchedulerBuilder(
+                                jobGraph, ComponentMainThreadExecutorServiceAdapter.forMainThread())
                         .setExecutionSlotAllocatorFactory(
                                 SchedulerTestingUtils.newSlotSharingExecutionSlotAllocatorFactory(
                                         TestingPhysicalSlotProvider.create(
@@ -91,8 +91,6 @@ public class ExecutionGraphCoLocationRestartTest {
         final ExecutionGraph eg = scheduler.getExecutionGraph();
 
         // enable the queued scheduling for the slot pool
-        scheduler.initialize(ComponentMainThreadExecutorServiceAdapter.forMainThread());
-
         assertEquals(JobStatus.CREATED, eg.getState());
 
         scheduler.startScheduling();
