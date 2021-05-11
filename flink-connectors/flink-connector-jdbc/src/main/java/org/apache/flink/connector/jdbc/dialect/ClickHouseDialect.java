@@ -62,7 +62,12 @@ public class ClickHouseDialect extends AbstractDialect {
 		return new ClickHouseRowConverter(rowType);
 	}
 
-	@Override
+    @Override
+    public String getLimitClause(long limit) {
+            return "LIMIT " + limit;
+    }
+
+    @Override
 	public Optional<String> defaultDriverName() {
 		return Optional.of("ru.yandex.clickhouse.ClickHouseDriver");
 	}
